@@ -132,7 +132,7 @@ class Market < ApplicationRecord
   before_validation(on: :create) { self.id = "#{base_currency}#{quote_currency}" }
   before_validation(on: :create) { self.position = Market.count + 1 unless position.present? }
 
-  after_commit { AMQP::Queue.enqueue(:matching, action: 'new', market: id) }
+  after_commit :enqueue_market
   after_commit :wipe_cache
   after_create { insert_position(self) }
 
@@ -142,6 +142,18 @@ class Market < ApplicationRecord
 
   def initialize_defaults
     self.data = {} if data.blank?
+  end
+
+  def enqueue_market
+    case id
+    when 'btcusdc'
+      matcher = 'matching_btcusdc'
+    when 'ethusdc','dotusdc'
+      matcher = 'matching_ethusdc_dotusdc'
+    else
+      matcher = 'matching_rest'
+    end
+    AMQP::Queue.enqueue(matcher.to_sym, action: 'new', market: id)
   end
 
   def wipe_cache

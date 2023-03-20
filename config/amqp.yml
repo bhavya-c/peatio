@@ -20,6 +20,9 @@ exchange:
   matching:
     name: peatio.matching
     type: direct
+  matching_currency:
+    name: peatio.matching.currency
+    type: topic
   finex-spot:
     name: finex.orderapi
     type: direct
@@ -28,8 +31,14 @@ exchange:
     type: direct
 
 queue:
-  matching:
-    name: peatio.matching
+  matching_btcusdc:
+    name: peatio.matching.btcusdc
+    durable: true
+  matching_ethusdc_dotusdc:
+    name: peatio.matching.ethusdc_dotusdc
+    durable: true
+  matching_rest:
+    name: peatio.matching.rest
     durable: true
     # You can set queue maximum length (see https://www.rabbitmq.com/maxlength.html).
     # For order matching queue it is recommended to set limit about to 10000 per market.
@@ -80,10 +89,21 @@ queue:
     name: peatio.events.processor
 
 binding:
-  matching:
-    queue: matching
+  matching_btcusdc:
+    queue: matching_btcusdc
     clean_start: true
-    exchange: matching
+    exchange: matching_currency
+    topics: 'market.btcusdc'
+  matching_ethusdc_dotusdc:
+    queue: matching_ethusdc_dotusdc
+    clean_start: true
+    exchange: matching_currency
+    topics: 'market.ethusdc_dotusdc'
+  matching_rest:
+    queue: matching_rest
+    clean_start: true
+    exchange: matching_currency
+    topics: 'market.#'
   trade_executor:
     queue: new_trade
     exchange: matching

@@ -35,6 +35,16 @@ module Workers
         end
       end
 
+      def publish_to_queue(payload, exchange_name, queue_name)
+        exchange = @channel.direct(exchange_name, :durable => true)
+        queue = @channel.queue(queue_name, :durable => true)
+        queue.bind(exchange)
+
+        exchange.publish(payload.to_json, :persistent => true)
+
+        queue.unbind(exchange)
+      end
+
       def submit(order)
         engines[order.market].submit(order)
       end

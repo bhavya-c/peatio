@@ -29,8 +29,22 @@ Signal.trap("INT",  &terminate)
 Signal.trap("TERM", &terminate)
 
 workers = []
-ARGV.each do |id|
-  worker = AMQP::Config.binding_worker(id)
+all_args = []
+
+if ARGV[0] == 'matching'
+  if ARGV[1].include?('--include')
+    include_index = ARGV[1].index('=') + 1
+    include_currencies = ARGV[1][include_index..-1].split(',')
+    id = "matching_#{include_currencies.join("_")}"  
+  elsif  ARGV[1].include?('--exclude')
+    id = "matching_rest"  
+  end
+  all_args << id
+else
+  all_args = ARGV
+end
+
+all_args.each do |id|  worker = AMQP::Config.binding_worker(id)
   queue  = ch.queue *AMQP::Config.binding_queue(id)
 
   if args = AMQP::Config.binding_exchange(id)
