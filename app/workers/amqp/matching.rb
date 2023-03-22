@@ -15,7 +15,13 @@ module Workers
 
       def initialize(options={})
         @options = options
-        reload 'all'
+        filtered_currencies = if options[:include_currencies].present?
+          options[:include_currencies].split(",")
+        else
+          Market.pluck(:base_currency) - options[:exclude_currencies].split(",")
+        end
+
+        reload filtered_currencies
       end
 
       def process(payload, metadata, delivery_info)
@@ -27,12 +33,22 @@ module Workers
         when 'cancel'
           cancel build_order(payload[:order])
         when 'reload'
-          reload payload[:market]
+          reload payload[:market].to_a
         when 'new'
           initialize_engine Market.find(payload[:market])
         else
           Rails.logger.fatal { "Unknown action: #{payload[:action]}" }
         end
+      end
+
+      def publish_to_queue(payload, exchange_name, queue_name)
+        exchange = @channel.direct(exchange_name, :durable => true)
+        queue = @channel.queue(queue_name, :durable => true)
+        queue.bind(exchange)
+
+        exchange.publish(payload.to_json, :persistent => true)
+
+        queue.unbind(exchange)
       end
 
       def submit(order)
@@ -43,15 +59,8 @@ module Workers
         engines[order.market].cancel(order)
       end
 
-      def reload(market)
-        if market == 'all'
-          # NOTE: Run matching engine for disabled markets.
-          Market.find_each(&method(:initialize_engine))
-          Rails.logger.info { "All engines reloaded." }
-        else
-          initialize_engine Market.find(market)
-          Rails.logger.info { "#{market} engine reloaded." }
-        end
+      def reload(markets)
+        Market.where(id: markets).find_each(&method(:initialize_engine))
       rescue DryrunError => e
         # stop started engines
         engines.each {|id, engine| engine.shift_gears(:dryrun) unless engine == e.engine }

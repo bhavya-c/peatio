@@ -29,8 +29,12 @@ module AMQP
         queue data[:binding][id][:queue]
       end
 
-      def binding_worker(id)
-        ::Workers::AMQP.const_get(id.to_s.camelize).new
+      def binding_worker(id, args)
+        if args.present?
+          ::Workers::AMQP.const_get(id.to_s.camelize).new(args)
+        else
+         ::Workers::AMQP.const_get(id.to_s.camelize).new
+        end
       end
 
       def routing_key(id)

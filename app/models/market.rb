@@ -119,6 +119,7 @@ class Market < ApplicationRecord
             numericality: { greater_than_or_equal_to: ->(market){ market.min_amount_by_precision } }
 
   validates :state, inclusion: { in: STATES }
+  QUEUES = ['matching_btcusdc','matching_ethusdc_dotusdc', 'matching_rest']
 
   # == Scopes ===============================================================
 
@@ -132,7 +133,7 @@ class Market < ApplicationRecord
   before_validation(on: :create) { self.id = "#{base_currency}#{quote_currency}" }
   before_validation(on: :create) { self.position = Market.count + 1 unless position.present? }
 
-  after_commit { AMQP::Queue.enqueue(:matching, action: 'new', market: id) }
+  after_commit :enqueue_market
   after_commit :wipe_cache
   after_create { insert_position(self) }
 
@@ -142,6 +143,11 @@ class Market < ApplicationRecord
 
   def initialize_defaults
     self.data = {} if data.blank?
+  end
+
+  def enqueue_market
+    queue = QUEUES.detect{|q| q.include?(id)} || "matching_rest"
+    AMQP::Queue.enqueue(queue.to_sym, action: 'new', market: id
   end
 
   def wipe_cache

@@ -1,6 +1,8 @@
 # encoding: UTF-8
 # frozen_string_literal: true
 
+require 'optparse'
+
 require File.join(ENV.fetch('RAILS_ROOT'), 'config', 'environment')
 
 raise "bindings must be provided." if ARGV.size == 0
@@ -28,14 +30,28 @@ at_exit { conn.close }
 Signal.trap("INT",  &terminate)
 Signal.trap("TERM", &terminate)
 
-workers = []
-ARGV.each do |id|
-  worker = AMQP::Config.binding_worker(id)
-  queue  = ch.queue *AMQP::Config.binding_queue(id)
+OptionParser.new do |opts|
+  opts.banner = 'Usage: amqp_daemon.rb [options]'
 
+  opts.on('-i', '--include currencies', 'Include only messages from specified queue') do |queue_name|
+    @include_currencies = queue_name
+  end
+
+  opts.on('-e', '--exclude currencies', 'Exclude only messages from specified queue') do |queue_name|
+    @exclude_currencies = queue_name
+  end
+end.parse!
+
+workers = []
+
+ARGV.each do |id|
+  if @include_currencies.present? || @exclude_currencies.present?
+    options = { include_currencies: @include_currencies, exclude_currencies: @exclude_currencies }
+  end
+  worker = AMQP::Config.binding_worker(id, options )
+  queue  = ch.queue *AMQP::Config.binding_queue(id)
   if args = AMQP::Config.binding_exchange(id)
     x = ch.send *args
-
     case args.first
     when 'direct'
       queue.bind x, routing_key: AMQP::Config.routing_key(id)
