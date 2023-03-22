@@ -119,6 +119,7 @@ class Market < ApplicationRecord
             numericality: { greater_than_or_equal_to: ->(market){ market.min_amount_by_precision } }
 
   validates :state, inclusion: { in: STATES }
+  QUEUES = ['matching_btcusdc','matching_ethusdc_dotusdc', 'matching_rest']
 
   # == Scopes ===============================================================
 
@@ -145,15 +146,8 @@ class Market < ApplicationRecord
   end
 
   def enqueue_market
-    case id
-    when 'btcusdc'
-      matcher = 'matching_btcusdc'
-    when 'ethusdc','dotusdc'
-      matcher = 'matching_ethusdc_dotusdc'
-    else
-      matcher = 'matching_rest'
-    end
-    AMQP::Queue.enqueue(matcher.to_sym, action: 'new', market: id)
+    queue = QUEUES.detect{|q| q.include?(id)} || "matching_rest"
+    AMQP::Queue.enqueue(queue.to_sym, action: 'new', market: id
   end
 
   def wipe_cache

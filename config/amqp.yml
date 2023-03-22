@@ -31,6 +31,9 @@ exchange:
     type: direct
 
 queue:
+  matching:
+    name: peatio.matching
+    durable: true
   matching_btcusdc:
     name: peatio.matching.btcusdc
     durable: true

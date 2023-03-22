@@ -122,7 +122,8 @@ class Order < ApplicationRecord
         order.record_submit_operations!
         order.update!(state: ::Order::WAIT)
 
-        AMQP::Queue.enqueue(:matching, action: 'submit', order: order.to_matching_attributes)
+        queue = Market::QUEUES.detect{|q| q.include?(order.market_id)} || "matching_rest"
+        AMQP::Queue.enqueue(queue, action: 'submit', order: order.to_matching_attributes)
       end
     rescue => e
       order = find_by_id!(id)
